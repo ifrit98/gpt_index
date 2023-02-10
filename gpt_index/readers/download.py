@@ -17,6 +17,51 @@ LOADER_HUB_URL = (
     "https://raw.githubusercontent.com/emptycrown/loader-hub/main/loader_hub"
 )
 
+LOADER_HUB_PATH = (
+    r"C:\Users\stgeorge\Desktop\BlackRiverGPT\sandbox\library.json"
+)
+
+
+def download_loader_new(loader_class: str) -> BaseReader:
+    """Download a single loader from the Loader Hub.
+
+    Args:
+        loader_class: The name of the loader class you want to download,
+            such as `SimpleWebPageReader`.
+    Returns:
+        A Loader.
+    """
+
+    with open(LOADER_HUB_PATH, 'r') as openfile:
+        library = json.load(openfile)
+
+    # Look up the loader id (e.g. `web/simple_web`)
+    loader_id = library[loader_class]["id"]
+    dirpath = ".modules"
+    loader_filename = loader_id.replace("/", "-")
+    loader_path = f"{dirpath}/{loader_filename}.py"
+    requirements_path = f"{dirpath}/{loader_filename}_requirements.txt"
+
+    # Install dependencies if there are any and not already installed
+    if os.path.exists(requirements_path):
+        try:
+            requirements = pkg_resources.parse_requirements(
+                Path(requirements_path).open()
+            )
+            pkg_resources.require([str(r) for r in requirements])
+        except DistributionNotFound:
+            subprocess.check_call(
+                [sys.executable, "-m", "pip", "install", "-r", requirements_path]
+            )
+
+    spec = util.spec_from_file_location("custom_loader", location=loader_path)
+    if spec is None:
+        raise ValueError(f"Could not find file: {loader_path}.")
+    module = util.module_from_spec(spec)
+    spec.loader.exec_module(module)  # type: ignore
+
+    return getattr(module, loader_class)
+
 
 def download_loader(loader_class: str) -> BaseReader:
     """Download a single loader from the Loader Hub.
